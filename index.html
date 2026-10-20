@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Biblioteca Digital Pessoal - Guarde, leia e baixe seus livros em PDF em qualquer lugar.">
+  <title>Minha Biblioteca Digital | Livros e PDFs</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- PDF.js para processamento e miniaturas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!-- Supabase JS para sincronização em nuvem -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- Barra de Navegação Superior -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="brand-icon">📚</div>
+        <span>Biblioteca<span style="color: var(--primary);">PDF</span></span>
+      </div>
+
+      <!-- Barra de Busca -->
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Buscar por título, autor, categoria..." autocomplete="off">
+      </div>
+
+      <!-- Ações do Topo -->
+      <div class="nav-actions">
+        <!-- Indicador e Botão da Nuvem -->
+        <button id="btnOpenCloud" class="btn btn-secondary cloud-indicator" title="Configurar Sincronização em Nuvem (Supabase)">
+          ☁️ <span class="nav-text">Nuvem</span>
+          <span id="cloudStatusDot" class="cloud-dot" title="Desconectado"></span>
+        </button>
+
+        <!-- Botão de Estatísticas e Backup -->
+        <button id="btnOpenStats" class="btn btn-secondary" title="Estatísticas e Backup">
+          📊 <span class="nav-text">Dados</span>
+        </button>
+
+        <!-- Alternar Tema Claro/Escuro -->
+        <button id="btnToggleTheme" class="btn-icon" title="Alternar Modo Escuro / Claro">
+          🌓
+        </button>
+
+        <!-- Botão Adicionar Livro -->
+        <button id="btnOpenAddModal" class="btn btn-primary" title="Adicionar novo livro à biblioteca">
+          ➕ <span>Adicionar Livro</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="app-container">
+
+    <!-- Estatísticas Rápidas -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue">📚</div>
+        <div class="stat-info">
+          <h4>Total de Livros</h4>
+          <div id="statTotalBooks" class="stat-value">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon cyan">📖</div>
+        <div class="stat-info">
+          <h4>Lendo Agora</h4>
+          <div id="statReading" class="stat-value">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-info">
+          <h4>Concluídos</h4>
+          <div id="statCompleted" class="stat-value">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">💾</div>
+        <div class="stat-info">
+          <h4>Espaço Usado</h4>
+          <div id="statStorage" class="stat-value">0 MB</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controles, Abas e Filtros -->
+    <section class="filters-section">
+      <div class="filter-row">
+        <!-- Abas de Status -->
+        <div class="status-tabs">
+          <button class="tab-btn active" data-status="all">
+            Todos <span id="badgeAll" class="tab-badge">0</span>
+          </button>
+          <button class="tab-btn" data-status="reading">
+            📖 Lendo <span id="badgeReading" class="tab-badge">0</span>
+          </button>
+          <button class="tab-btn" data-status="completed">
+            ✅ Concluídos <span id="badgeCompleted" class="tab-badge">0</span>
+          </button>
+          <button class="tab-btn" data-status="favorites">
+            ⭐ Favoritos <span id="badgeFavorites" class="tab-badge">0</span>
+          </button>
+          <button class="tab-btn" data-status="unread">
+            ⏳ Não lidos <span id="badgeUnread" class="tab-badge">0</span>
+          </button>
+        </div>
+
+        <!-- Ordenação e Modo Grade/Lista -->
+        <div class="controls-group">
+          <select id="sortSelect" class="sort-select">
+            <option value="recent">Mais Recentes</option>
+            <option value="titleAsc">Título (A-Z)</option>
+            <option value="titleDesc">Título (Z-A)</option>
+            <option value="authorAsc">Autor (A-Z)</option>
+            <option value="sizeDesc">Maior Tamanho</option>
+            <option value="pagesDesc">Mais Páginas</option>
+          </select>
+
+          <div class="view-toggle">
+            <button id="btnViewGrid" class="view-btn active" title="Visualização em Grade">🔲</button>
+            <button id="btnViewList" class="view-btn" title="Visualização em Lista">☰</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtro Horizontal de Categorias -->
+      <div id="categoriesList" class="category-pills">
+        <button class="pill-btn active" data-category="all">Todas as Categorias</button>
+      </div>
+    </section>
+
+    <!-- Grade / Lista de Livros -->
+    <section id="booksContainer" class="books-grid">
+      <!-- Inserido dinamicamente via JS -->
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       MODAL 1: Adicionar Novo Livro
+       ========================================================================= -->
+  <div id="modalAddBook" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">📖 Inserir Novo Livro</h3>
+        <button class="btn-close modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Área de Arrastar e Soltar PDF -->
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-icon">📁</div>
+          <div class="dropzone-text">Arraste seu arquivo PDF aqui ou clique para selecionar</div>
+          <div class="dropzone-sub">Suporta arquivos PDF de qualquer tamanho</div>
+          <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+        </div>
+
+        <form id="addBookForm">
+          <div class="form-grid">
+            <!-- Pré-visualização da Capa -->
+            <div>
+              <div class="cover-preview-box">
+                <img id="coverPreview" class="cover-preview-img" src="" alt="Capa do Livro" style="display: none;">
+                <span id="coverPlaceholder" style="color: var(--text-dim); text-align: center; font-size: 0.8rem; padding: 0.5rem;">Capa gerada automaticamente</span>
+              </div>
+              <label for="customCoverInput" style="display: block; text-align: center; font-size: 0.75rem; color: var(--primary); cursor: pointer; margin-top: 0.4rem;">Alterar Capa</label>
+              <input type="file" id="customCoverInput" accept="image/*" style="display: none;">
+            </div>
+
+            <!-- Campos do Formulário -->
+            <div class="form-fields">
+              <div class="form-group">
+                <label class="form-label" for="bookTitle">Título do Livro *</label>
+                <input type="text" id="bookTitle" class="form-control" required placeholder="Ex: O Pequeno Príncipe">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="bookAuthor">Autor</label>
+                <input type="text" id="bookAuthor" class="form-control" placeholder="Ex: Antoine de Saint-Exupéry">
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="bookCategory">Categoria / Gênero</label>
+                  <input type="text" id="bookCategory" class="form-control" list="categorySuggestions" placeholder="Ficção, Estudos, etc.">
+                  <datalist id="categorySuggestions">
+                    <option value="Ficção"></option>
+                    <option value="Tecnologia"></option>
+                    <option value="Estudos & Concursos"></option>
+                    <option value="Desenvolvimento Pessoal"></option>
+                    <option value="Finanças & Negócios"></option>
+                    <option value="História & Filosofia"></option>
+                    <option value="Ciência"></option>
+                    <option value="Quadrinhos & Mangás"></option>
+                  </datalist>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="bookStatus">Status de Leitura</label>
+                  <select id="bookStatus" class="form-control">
+                    <option value="unread">⏳ Não lido</option>
+                    <option value="reading">📖 Lendo</option>
+                    <option value="completed">✅ Concluído</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="bookCurrentPage">Página Atual</label>
+                  <input type="number" id="bookCurrentPage" class="form-control" min="0" value="0">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="bookTotalPages">Total de Páginas</label>
+                  <input type="number" id="bookTotalPages" class="form-control" min="0" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="bookDescription">Anotações / Sinopse</label>
+                <textarea id="bookDescription" class="form-control" rows="2" placeholder="Resumo do livro ou anotações pessoais..."></textarea>
+              </div>
+
+              <div class="form-group" id="storageDestGroup" style="display: none;">
+                <label class="form-label">Destino do Armazenamento</label>
+                <select id="storageDestination" class="form-control">
+                  <option value="both">🌐 Nuvem Supabase + Cópia Local (Recomendado)</option>
+                  <option value="local">💻 Apenas Local (IndexedDB neste navegador)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary modal-close-btn">Cancelar</button>
+            <button type="submit" id="btnSaveBook" class="btn btn-primary">Salvar Livro</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 2: Leitor de PDF Integrado
+       ========================================================================= -->
+  <div id="modalReader" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+      <div class="modal-header">
+        <h3 id="readerTitle" class="modal-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">
+          📖 Leitor de Livro
+        </h3>
+
+        <!-- Controles do Leitor -->
+        <div class="reader-controls">
+          <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+            <span>Pág:</span>
+            <input type="number" id="readerPageInput" class="page-input" min="1" value="1">
+            <span id="readerTotalPagesSpan">/ 0</span>
+          </div>
+
+          <button id="btnReaderDownload" class="btn btn-secondary" title="Baixar este PDF no dispositivo">
+            ⬇️ Baixar
+          </button>
+
+          <button id="btnReaderFullscreen" class="btn-icon" title="Tela cheia">
+            ⛶
+          </button>
+
+          <button class="btn-close modal-close-btn">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 0; height: 100%; display: flex; flex-direction: column;">
+        <div class="reader-frame-container" style="flex: 1;">
+          <iframe id="readerIframe" class="reader-iframe" src="" title="Visualizador de PDF"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 3: Sincronização em Nuvem (Supabase)
+       ========================================================================= -->
+  <div id="modalCloud" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">☁️ Conectar à Nuvem (Supabase)</h3>
+        <button class="btn-close modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="background-color: var(--bg-elevated); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.25rem; font-size: 0.88rem; line-height: 1.5;">
+          <strong>Acesse seus livros de qualquer lugar!</strong><br>
+          Conecte sua biblioteca a um projeto gratuito do <a href="https://supabase.com" target="_blank" style="color: var(--primary); text-decoration: underline;">Supabase</a> (1 GB de armazenamento grátis para PDFs).<br>
+          Basta criar um projeto grátis, executar o script SQL e colar as credenciais abaixo:
+        </div>
+
+        <form id="cloudConfigForm">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label" for="supabaseUrl">Project URL do Supabase *</label>
+            <input type="url" id="supabaseUrl" class="form-control" placeholder="https://xyzcompany.supabase.co" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label class="form-label" for="supabaseAnonKey">Anon Public API Key *</label>
+            <input type="password" id="supabaseAnonKey" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+          </div>
+
+          <div style="margin-bottom: 1.25rem;">
+            <button type="button" id="btnCopySql" class="btn btn-secondary" style="width: 100%;">
+              📋 Copiar Script SQL do Supabase
+            </button>
+          </div>
+
+          <div id="cloudStatusMessage" style="font-size: 0.85rem; padding: 0.5rem; border-radius: var(--radius-sm); margin-bottom: 1rem; display: none;"></div>
+
+          <div class="modal-footer" style="padding: 0; border: none; justify-content: space-between;">
+            <button type="button" id="btnDisconnectCloud" class="btn btn-danger" style="display: none;">Desconectar</button>
+            <div style="display: flex; gap: 0.5rem; margin-left: auto;">
+              <button type="button" class="btn btn-secondary modal-close-btn">Fechar</button>
+              <button type="submit" id="btnSaveCloud" class="btn btn-primary">Salvar e Conectar</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 4: Dados, Estatísticas e Backup
+       ========================================================================= -->
+  <div id="modalStats" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">📊 Dados e Backup da Biblioteca</h3>
+        <button class="btn-close modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+          <div style="background-color: var(--bg-elevated); padding: 1rem; border-radius: var(--radius-md);">
+            <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">📦 Armazenamento Local</h4>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+              Seus PDFs locais ficam salvos no banco de dados seguro IndexedDB deste navegador.
+            </p>
+            <div id="storageEstimateText" style="font-size: 0.88rem; font-weight: 600;">Calculando...</div>
+          </div>
+
+          <div>
+            <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">💾 Fazer Backup dos Metadados</h4>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Exporte a lista completa dos seus livros, histórico de leitura e favoritos em formato JSON para restaurar quando quiser.
+            </p>
+            <button id="btnExportBackup" class="btn btn-secondary">
+              📥 Exportar Backup (.json)
+            </button>
+          </div>
+
+          <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+            <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">📂 Restaurar Backup</h4>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Importe um arquivo de backup (.json) exportado anteriormente.
+            </p>
+            <button id="btnTriggerImport" class="btn btn-secondary">
+              📤 Selecionar Arquivo de Backup
+            </button>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+          </div>
+
+          <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+            <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem; color: var(--danger);">⚠️ Zona de Perigo</h4>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Deseja limpar todos os livros armazenados localmente neste navegador?
+            </p>
+            <button id="btnClearAll" class="btn btn-danger">
+              🗑️ Limpar Biblioteca Local
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close-btn">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container de Toasts de Notificação -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Scripts da Aplicação -->
+  <script src="js/db.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/pdf-helper.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- Registro do Service Worker (PWA) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.log('SW registration error:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
